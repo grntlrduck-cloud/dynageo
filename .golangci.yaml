@@ -1,3 +1,5 @@
+version: "2"
+
 run:
   timeout: 15m
   tests: true
@@ -15,29 +17,28 @@ linters:
     - goconst
     - gocritic
     - gocyclo
-    - gofmt
-    - goimports
     - goprintffuncname
     - gosec
-    - gosimple
-    - govet
     - ineffassign
     - lll
     - misspell
     - nakedret
     - noctx
     - nolintlint
-    - staticcheck
-    - stylecheck
-    - typecheck
     - unconvert
     - unparam
     - unused
     - whitespace
 
+formatters:
+  enable:
+    - gci
+    - gofmt
+    - gofumpt
+    - goimports
+    - golines
+
 linters-settings:
-  depguard:
-    list-type: denylist
   dupl:
     threshold: 100
   funlen:
