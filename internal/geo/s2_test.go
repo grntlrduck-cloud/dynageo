@@ -101,18 +101,18 @@ func TestGeoHashRanges(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, hash)
 
-	min := hash.min()
-	max := hash.max()
+	minH := hash.min()
+	maxH := hash.max()
 
-	assert.NotZero(t, min)
-	assert.NotZero(t, max)
+	assert.NotZero(t, minH)
+	assert.NotZero(t, maxH)
 
 	// For leaf cells, min and max might be equal
 	// So we just verify they're valid
 	if hash.hashID.IsLeaf() {
-		assert.LessOrEqual(t, min, max)
+		assert.LessOrEqual(t, minH, maxH)
 	} else {
-		assert.Less(t, min, max, "min should be less than max")
+		assert.Less(t, minH, maxH, "min should be less than max")
 	}
 }
 
