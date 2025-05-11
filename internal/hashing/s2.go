@@ -1,10 +1,11 @@
-package geo
+package hashing
 
 import (
 	"fmt"
 
 	"github.com/golang/geo/s1"
 	"github.com/golang/geo/s2"
+	"github.com/grntlrduck-cloud/dynageo/geo"
 )
 
 // in the case of a radius search we want to return more results than in the radius intentiaionally
@@ -27,44 +28,61 @@ var defaultPolylineCoverer = s2.RegionCoverer{
 }
 
 // The GeoHash wraps and hides the actual geohashing complexity
-type geoHash struct {
+type S2GeoHash struct {
+	level  int
 	hashID s2.CellID
 }
 
-func (h geoHash) hash() uint64 {
-	return uint64(h.hashID)
+func (s *S2GeoHash) Hash() uint64 {
+	return uint64(s.hashID)
 }
 
-func (h geoHash) trimmed(level int) uint64 {
-	if level < 0 || level > 30 {
-		return uint64(h.hashID)
+func (s *S2GeoHash) Trimmed() uint64 {
+	if s.level < 0 || s.level > 30 {
+		return uint64(s.hashID)
 	}
-	parent := s2.CellIDFromFacePosLevel(h.hashID.Face(), h.hashID.Pos(), level)
+	parent := s2.CellIDFromFacePosLevel(s.hashID.Face(), s.hashID.Pos(), s.level)
 	return uint64(parent)
 }
 
-func (h geoHash) min() uint64 {
-	return uint64(h.hashID.RangeMin())
+func (s *S2GeoHash) Min() uint64 {
+	return uint64(s.hashID.RangeMin())
 }
 
-func (h geoHash) max() uint64 {
-	return uint64(h.hashID.RangeMax())
+func (s *S2GeoHash) Max() uint64 {
+	return uint64(s.hashID.RangeMax())
 }
 
-func newGeoHash(lat, lon float64) (*geoHash, error) {
-	if lat < minLatitude || lat > maxLatitude || lon < minLongitude || lon > maxLongitude {
-		return nil, fmt.Errorf("invalid coordinates: lat=%f, lon=%f", lat, lon)
+func (s *S2GeoHash) Level() int {
+	return s.level
+}
+
+func NewS2GeoHash(coordinates geo.Coordinates, level int) (*S2GeoHash, error) {
+	if coordinates.Latitude < minLatitude || coordinates.Latitude > maxLatitude ||
+		coordinates.Longitude < minLongitude ||
+		coordinates.Longitude > maxLongitude {
+		return nil, fmt.Errorf(
+			"invalid coordinates: latitude=%f, longitude=%f",
+			coordinates.Latitude,
+			coordinates.Longitude,
+		)
 	}
-	latLonAngles := s2.LatLngFromDegrees(lat, lon)
+
+	if level < 0 || level > 30 {
+		return nil, fmt.Errorf("invalid level: %d, level must be between 0 and 30", level)
+	}
+
+	latLonAngles := s2.LatLngFromDegrees(coordinates.Latitude, coordinates.Longitude)
 	cell := s2.CellFromLatLng(latLonAngles)
-	return &geoHash{hashID: cell.ID()}, nil
+	return &S2GeoHash{hashID: cell.ID(), level: level}, nil
 }
 
-func newHashesFromRadiusCenter(
-	c Coordinates,
+func NewHashesFromRadiusCenter(
+	c geo.Coordinates,
 	radius float64,
+	level int,
 	coverer *s2.RegionCoverer,
-) ([]geoHash, error) {
+) ([]S2GeoHash, error) {
 	if !isValidLatLon(c.Latitude, c.Longitude) {
 		return nil, fmt.Errorf("invalid search center: lat=%f, lon=%f", c.Latitude, c.Longitude)
 	}
@@ -75,10 +93,14 @@ func newHashesFromRadiusCenter(
 		coverer = &defaultAreaCoverer
 	}
 	covering := coverer.Covering(region)
-	return newGeoHashesFromCells(covering), nil
+	return newGeoHashesFromCells(covering, level), nil
 }
 
-func newHashesFromBbox(ne, sw Coordinates, coverer *s2.RegionCoverer) ([]geoHash, error) {
+func NewHashesFromBbox(
+	ne, sw geo.Coordinates,
+	level int,
+	coverer *s2.RegionCoverer,
+) ([]S2GeoHash, error) {
 	if !isValidLatLon(ne.Latitude, ne.Longitude) || !isValidLatLon(sw.Latitude, sw.Longitude) {
 		return nil, fmt.Errorf(
 			"invalid bounding box: ne.lat=%f, ne.lon=%f, sw.lat=%f, sw.lon=%f",
@@ -95,10 +117,14 @@ func newHashesFromBbox(ne, sw Coordinates, coverer *s2.RegionCoverer) ([]geoHash
 		coverer = &defaultAreaCoverer
 	}
 	covering := coverer.Covering(bounder.RectBound())
-	return newGeoHashesFromCells(covering), nil
+	return newGeoHashesFromCells(covering, level), nil
 }
 
-func newHashesFromRoute(path []Coordinates, coverer *s2.RegionCoverer) ([]geoHash, error) {
+func NewHashesFromRoute(
+	path []geo.Coordinates,
+	level int,
+	coverer *s2.RegionCoverer,
+) ([]S2GeoHash, error) {
 	if len(path) < 2 {
 		return nil, fmt.Errorf("invalid path: length=%d", len(path))
 	}
@@ -125,18 +151,18 @@ func newHashesFromRoute(path []Coordinates, coverer *s2.RegionCoverer) ([]geoHas
 		coverer = &defaultPolylineCoverer
 	}
 	covering := coverer.Covering(polyline)
-	return newGeoHashesFromCells(covering), nil
+	return newGeoHashesFromCells(covering, level), nil
 }
 
-func newGeoHashesFromCells(cells []s2.CellID) []geoHash {
-	hashes := make([]geoHash, len(cells))
+func newGeoHashesFromCells(cells []s2.CellID, level int) []S2GeoHash {
+	hashes := make([]S2GeoHash, len(cells))
 	for i, v := range cells {
-		hashes[i] = geoHash{hashID: v}
+		hashes[i] = S2GeoHash{hashID: v, level: level}
 	}
 	return hashes
 }
 
-func pointFromCords(c Coordinates) s2.Point {
+func pointFromCords(c geo.Coordinates) s2.Point {
 	return s2.PointFromLatLng(s2.LatLngFromDegrees(c.Latitude, c.Longitude))
 }
 
