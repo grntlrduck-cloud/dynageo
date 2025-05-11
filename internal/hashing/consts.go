@@ -1,4 +1,4 @@
-package geo
+package hashing
 
 const (
 	earthRadiusMeter = 6371000.0
