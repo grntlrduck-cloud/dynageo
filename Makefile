@@ -8,6 +8,9 @@ vuln_scan:
 lint:
 	golangci-lint run ./...
 
+lint_fix:
+	golangci-lint run --fix ./...
+
 update:
 	go get -u ./...
 	go mod tidy
